@@ -10,44 +10,31 @@ import org.apache.log4j.Logger;
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 
 public class BasicSftp {
-	
+
 	final static Logger log = Logger.getLogger(BasicSftp.class);
 
 	/**
 	 * 
-	 * @param host
-	 * @param port
-	 * @param usr
-	 * @param pwd
+	 * @param conf
 	 * @param localPath
 	 * @param localFileName
 	 * @param remotePath
 	 * @param remoteFileName
 	 * @throws Exception
 	 */
-	public void putFile(String host,int port,String usr,String pwd,String localPath,String localFileName,String remotePath,String remoteFileName) throws Exception {
-		JSch jsch = new JSch();
+	public void putFile(Config conf, String localPath, String localFileName, String remotePath, String remoteFileName)
+			throws Exception {
+
 		Session session = null;
 		ChannelSftp sftpChannel = null;
 		try {
-			session = jsch.getSession(usr, host, 22);
-			session.setConfig("StrictHostKeyChecking", "no");
-			session.setPassword(pwd);
 
-			log.info("Session connect...");
-			session.connect();
-			log.info("Session connected.");
+			connect(session, sftpChannel, conf);
 
-			Channel channel = session.openChannel("sftp");
-
-			log.info("Channel connect...");
-			channel.connect();
-			log.info("Channel connected.");
-
-			sftpChannel = (ChannelSftp) channel;
 			log.info("Working directory : " + sftpChannel.pwd());
 
 			log.info("Change directory to : " + remotePath);
@@ -55,23 +42,67 @@ public class BasicSftp {
 
 			sftpChannel.lcd(localPath);
 
-			File[] files = getSourceFiles(localPath, localFileName);
-			if (files.length > 0) {
-				for (File file : files) {
+			log.info("Upload file : " + localFileName + " to : " + remoteFileName);
+			sftpChannel.put(localFileName, remoteFileName);
 
-					log.info("Upload file : " + file.getName() + " to : " + file.getName());
-					sftpChannel.put(file.getName(),file.getName());
+		} catch (Exception e) {
+			log.error(e);
+			throw e;
+		} finally {
+			if (sftpChannel != null) {
+				try {
+					if (!sftpChannel.isClosed()) {
+						sftpChannel.exit();
+					}
+				} catch (Exception e) {
+					log.error(e);
 				}
+			}
 
-			} else {
-				if (!remoteFileName.equals("*")) {
-					log.info("Upload file : " + localFileName + " to : "
-							+ remoteFileName);
-					sftpChannel.put(localFileName, remoteFileName);
-				} else {
-					log.info("Upload file : " + localFileName + " to : " + localFileName);
-					sftpChannel.put(localFileName, localFileName);
+			if (session != null) {
+				try {
+					if (session.isConnected()) {
+						session.disconnect();
+					}
+				} catch (Exception e) {
+					log.error(e);
 				}
+			}
+
+		}
+	}
+
+	/**
+	 * 
+	 * @param conf
+	 * @param localPath
+	 *            Local directory of program running.
+	 * @param matchFile
+	 *            Match file expression string for find file in local directory
+	 *            to put to remote server.
+	 * @param remotePath
+	 *            Remote directory to upload your file.
+	 * @throws Exception 
+	 */
+	public void putFile(Config conf, String localPath, String matchFile, String remotePath) throws Exception {
+		Session session = null;
+		ChannelSftp sftpChannel = null;
+		try {
+
+			connect(session, sftpChannel, conf);
+
+			log.info("Working directory : " + sftpChannel.pwd());
+
+			log.info("Change directory to : " + remotePath);
+			prepareDirectory(sftpChannel, remotePath);
+
+			sftpChannel.lcd(localPath);
+
+			File[] files = getSourceFiles(localPath, matchFile);
+
+			for (File file : files) {
+				log.info("Upload file : " + file.getName() + " to : " + file.getName());
+				sftpChannel.put(file.getName(), file.getName());
 			}
 
 		} catch (Exception e) {
@@ -84,6 +115,7 @@ public class BasicSftp {
 						sftpChannel.exit();
 					}
 				} catch (Exception e) {
+					log.error(e);
 				}
 			}
 
@@ -93,10 +125,31 @@ public class BasicSftp {
 						session.disconnect();
 					}
 				} catch (Exception e) {
+					log.error(e);
 				}
 			}
 
 		}
+	}
+
+	private void connect(Session session, ChannelSftp sftpChannel, Config conf) throws JSchException {
+
+		JSch jsch = new JSch();
+		session = jsch.getSession(conf.getUsr(), conf.getHost(), conf.getPort());
+		session.setConfig("StrictHostKeyChecking", "no");
+		session.setPassword(conf.getPwd());
+
+		log.info("Session connect...");
+		session.connect();
+		log.info("Session connected.");
+
+		Channel channel = session.openChannel("sftp");
+
+		log.info("Channel connect...");
+		channel.connect();
+		log.info("Channel connected.");
+
+		sftpChannel = (ChannelSftp) channel;
 	}
 
 	private File[] getSourceFiles(String sourceDir, final String sourceFileName) {
@@ -114,14 +167,19 @@ public class BasicSftp {
 					@Override
 					public boolean accept(File dir, String name) {
 						boolean match = false;
-						String startMath = sourceFileName.substring(0, sourceFileName.indexOf("*"));
-						String endMath = sourceFileName.substring(sourceFileName.indexOf("*") + 1,
-								sourceFileName.length());
 
-						match = !startMath.equals("") ? name.startsWith(startMath) : true;
+						String[] matchs = sourceFileName.split("*");
 
-						match = !endMath.equals("") ? name.endsWith(endMath) : true;
-
+						for (int i = 0, idx = 0; i < matchs.length; i++) {
+							int fidx = name.indexOf(matchs[i], idx);
+							if (fidx > -1) {
+								match = true;
+								idx = fidx + matchs[i].length();
+							} else {
+								match = false;
+								break;
+							}
+						}
 						return match;
 					}
 				});

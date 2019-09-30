@@ -7,7 +7,7 @@ package org.basic;
  * @author somphop.h
  *
  */
-public class Config {
+public class SFTPConfig {
 	private String host;
 	private int port;
 	private String usr;

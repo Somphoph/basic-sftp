@@ -26,7 +26,7 @@ public class BasicSftp {
 	 * @param remoteFileName
 	 * @throws Exception
 	 */
-	public void putFile(Config conf, String localPath, String localFileName, String remotePath, String remoteFileName)
+	public void putFile(SFTPConfig conf, String localPath, String localFileName, String remotePath, String remoteFileName)
 			throws Exception {
 
 		Session session = null;
@@ -84,7 +84,7 @@ public class BasicSftp {
 	 *            Remote directory to upload your file.
 	 * @throws Exception 
 	 */
-	public void putFile(Config conf, String localPath, String matchFile, String remotePath) throws Exception {
+	public void putFile(SFTPConfig conf, String localPath, String matchFile, String remotePath) throws Exception {
 		Session session = null;
 		ChannelSftp sftpChannel = null;
 		try {
@@ -132,7 +132,7 @@ public class BasicSftp {
 		}
 	}
 
-	private void connect(Session session, ChannelSftp sftpChannel, Config conf) throws JSchException {
+	private void connect(Session session, ChannelSftp sftpChannel, SFTPConfig conf) throws JSchException {
 
 		JSch jsch = new JSch();
 		session = jsch.getSession(conf.getUsr(), conf.getHost(), conf.getPort());

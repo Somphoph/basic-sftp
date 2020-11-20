@@ -1,9 +1,6 @@
 package org.basic
 
-import com.jcraft.jsch.ChannelSftp
-import com.jcraft.jsch.JSch
-import com.jcraft.jsch.JSchException
-import com.jcraft.jsch.Session
+import com.jcraft.jsch.*
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
@@ -16,6 +13,7 @@ class BasicSftp {
         var session: Session? = null
         var sftpChannel: ChannelSftp? = null
         try {
+            val localFile = File(localFilePath)
             val connObj = connect(session, sftpChannel, conf)
             session = connObj.session
             sftpChannel = connObj.sftpChannel
@@ -29,15 +27,15 @@ class BasicSftp {
 
             prepareDirectory(sftpChannel, remoteDir.path)
 
-            val localFile = File(localFilePath)
+
             val localDir = localFile.parentFile
             if (localDir.isDirectory) {
                 sftpChannel.lcd(localDir.path)
             }
             log.info("Upload file : " + localFilePath + " to : " + remoteFile.name)
             sftpChannel.put(localFilePath, remoteFile.name)
-        } catch (e: Exception) {
-            log.error("Error on put file.",e)
+        } catch (e: SftpException) {
+            log.error("Error on put file error : ${e.id} - ${e.message}",e)
             throw e
         } finally {
             disconnect(session, sftpChannel)
@@ -83,7 +81,6 @@ class BasicSftp {
             val connObj = connect(session, sftpChannel, conf)
             session = connObj.session
             sftpChannel = connObj.sftpChannel
-
             sftpChannel!!.get(remoteFile, localFile)
         } catch (e: Exception) {
             log.error("Error on get file.",e)
